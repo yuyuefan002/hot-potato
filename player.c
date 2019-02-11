@@ -31,10 +31,10 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   buf[numbytes] = '\0';
+
   int total_num = 0;
   decodeID(&userid, &total_num, buf);
   printf("Connected as player %d out of %d total players", userid, total_num);
-
   close(sockfd);
 
   return 0;

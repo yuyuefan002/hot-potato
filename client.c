@@ -10,7 +10,6 @@ void *get_in_addr(struct sockaddr *sa) {
 
 int init(const char *hostname, const char *port) {
   int sockfd;
-  char s[INET6_ADDRSTRLEN];
   struct addrinfo hints, *servinfo, *p;
   int rv;
   memset(&hints, 0, sizeof hints);
@@ -44,8 +43,5 @@ int init(const char *hostname, const char *port) {
   }
 
   freeaddrinfo(servinfo); // all done with this structure
-  inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s,
-            sizeof s);
-  printf("client: connecting to %s\n", s);
   return sockfd;
 }

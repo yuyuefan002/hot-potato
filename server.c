@@ -89,7 +89,7 @@ int wait_client_ready(int new_fd) {
       return -1;
     }
     if (numbytes == 0) {
-      fprintf(stderr, "zombie connectiong\n");
+      fprintf(stderr, "server: socket %d hung up\n", new_fd);
       return -1;
     }
     buf[numbytes] = '\0';
@@ -98,10 +98,57 @@ int wait_client_ready(int new_fd) {
 }
 int send_client_id(int new_fd, int id, int total_num) {
   char str[10];
-  sprintf(str, "%d,%d", id + 1, total_num);
-  if (send(new_fd, str, sizeof(str), 0) == -1) {
+  sprintf(str, "%d,%d", id, total_num);
+  int size = sizeof(str);
+  if (sendall(new_fd, str, &size) == -1) {
     perror("send");
     return -1;
   }
   return 0;
+}
+
+int sendall(int s, char *buf, int *len) {
+  int total = 0;        // how many bytes we've sent
+  int bytesleft = *len; // how many we have left to send
+  int n;
+
+  while (total < *len) {
+    n = send(s, buf + total, bytesleft, 0);
+    if (n == -1) {
+      break;
+    }
+    total += n;
+    bytesleft -= n;
+  }
+
+  *len = total; // return number actually sent here
+
+  return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
+}
+
+int accept_new_connection(int listener, struct sockaddr_storage *remoteaddr,
+                          int *fdmax, fd_set *master) {
+  socklen_t addrlen;
+  int newfd;
+  addrlen = sizeof *remoteaddr;
+  newfd = accept(listener, (struct sockaddr *)&remoteaddr, &addrlen);
+
+  if (newfd == -1) {
+    perror("accept");
+  } else {
+    FD_SET(newfd, master); // add to master set
+    if (newfd > *fdmax) {  // keep track of the max
+      *fdmax = newfd;
+    }
+  }
+  return newfd;
+}
+void set_up_connection(int new_fd, int current_id, int num_players) {
+  if (wait_client_ready(new_fd) == -1) {
+    fprintf(stderr, "fail to receive ready info from client\n");
+    close(new_fd);
+    exit(EXIT_FAILURE);
+  }
+  if (send_client_id(new_fd, current_id, num_players) == -1)
+    fprintf(stderr, "fail to send info to client\n");
 }
