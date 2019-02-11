@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
   struct sigaction sa;
   struct sockaddr_storage client_addr; // connector's address information
   sockfd = init(hostname, port);
+  print_system_info(num_players, num_hops);
   sa.sa_handler = sigchld_handler; // reap all dead processes
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART;
@@ -44,30 +45,30 @@ int main(int argc, char **argv) {
     perror("sigaction");
     return EXIT_FAILURE;
   }
-  // accept connection
-  socklen_t addr_size = sizeof(client_addr);
-  new_fd = accept(sockfd, (struct sockaddr *)&client_addr, &addr_size);
   // build connection with each player and setting up the game
-  while (1) { // main accept() loop
+  int i = 0;
+  while (i < num_players) { // main accept() loop
     sin_size = sizeof(client_addr);
     new_fd = accept(sockfd, (struct sockaddr *)&client_addr, &sin_size);
     if (new_fd == -1) {
       perror("accept");
       continue;
     }
-    char s[INET6_ADDRSTRLEN];
-    inet_ntop(client_addr.ss_family,
-              get_in_addr((struct sockaddr *)&client_addr), s, sizeof s);
-    printf("server: got connection from %s\n", s);
-
+    print_player_ready_info(i);
     if (!fork()) {   // this is the child process
       close(sockfd); // child doesn't need the listener
-      if (send(new_fd, "Hello, world!", 13, 0) == -1)
-        perror("send");
+      if (wait_client_ready(new_fd) == -1) {
+        fprintf(stderr, "fail to receive ready info from client\n");
+        close(new_fd);
+        exit(EXIT_FAILURE);
+      }
+      if (send_client_id(new_fd, i, num_players) == -1)
+        fprintf(stderr, "fail to send info to client\n");
       close(new_fd);
-      exit(0);
+      exit(EXIT_SUCCESS);
     }
     close(new_fd); // parent doesn't need this
+    i++;
   }
   return EXIT_SUCCESS;
   // initialize the potato and send it out

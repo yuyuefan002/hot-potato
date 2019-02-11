@@ -66,11 +66,42 @@ bool verify_args(char *port, int num_player, int num_hop) {
 
 void print_system_info(int player_num, int hop_num) {
   printf("Potato Ringmaster\n");
-  printf("Players = <%d>\n", player_num);
-  printf("Hops = <%d>\n", hop_num);
+  printf("Players = %d\n", player_num);
+  printf("Hops = %d\n", hop_num);
 }
 void print_start_info(int startplayer_num) {
   printf("Ready to start the game, sending potato to player <%d>\n",
          startplayer_num);
 }
 void print_trace(potato_t potato) { printf("Trace of potato:\n"); }
+
+void print_player_ready_info(int player_num) {
+  printf("Player %d is ready to play\n", player_num + 1);
+}
+
+int wait_client_ready(int new_fd) {
+  char buf[10];
+  int numbytes;
+
+  while (strcmp(buf, "ready") != 0) {
+    if ((numbytes = recv(new_fd, buf, 10 - 1, 0)) == -1) {
+      perror("recv");
+      return -1;
+    }
+    if (numbytes == 0) {
+      fprintf(stderr, "zombie connectiong\n");
+      return -1;
+    }
+    buf[numbytes] = '\0';
+  }
+  return 0;
+}
+int send_client_id(int new_fd, int id, int total_num) {
+  char str[10];
+  sprintf(str, "%d,%d", id + 1, total_num);
+  if (send(new_fd, str, sizeof(str), 0) == -1) {
+    perror("send");
+    return -1;
+  }
+  return 0;
+}
