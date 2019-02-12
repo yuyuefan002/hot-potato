@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   int total_num = 0;
   decodeID(&userid, &total_num, buf);
-  printf("Connected as player %d out of %d total players", userid, total_num);
+  printf("Connected as player %d out of %d total players\n", userid, total_num);
   close(sockfd);
 
   return 0;
