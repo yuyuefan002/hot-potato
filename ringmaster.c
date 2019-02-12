@@ -53,10 +53,8 @@ int main(int argc, char **argv) {
           // handle new connections
           int newfd =
               accept_new_connection(listener, &remoteaddr, &fdmax, &master);
-
-          updateClientList(&client_list, &remoteaddr);
-          printf("%ld,%d\n", client_list.size, current_id);
-          set_up_connection(newfd, current_id, num_players, client_list);
+          set_up_connection(newfd, current_id, num_players, &client_list,
+                            &remoteaddr);
           print_player_ready_info(current_id++);
           if (current_id > num_players) {
             close(listener);

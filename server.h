@@ -31,18 +31,18 @@ bool verify_args(char *port, int num_player, int num_hop);
 int init(const char *hostname, const char *port);
 int client_init(const char *hostname, const char *port);
 void set_up_connection(int new_fd, int current_id, int num_players,
-                       client_list_t client_list);
+                       client_list_t *client_list,
+                       struct sockaddr_storage *remoteaddr);
 int wait_client_ready(int new_fd);
-int send_client_id(int new_fd, int id, int total_num);
+
 void print_system_info(int player_num, int hop_num);
 void print_player_ready_info(int player_num);
 int sendall(int s, char *buf, int *len);
 int accept_new_connection(int listener, struct sockaddr_storage *remoteaddr,
                           int *fdmax, fd_set *master);
 void disconZombie(int nbytes, int i, fd_set *master);
-void updateClientList(client_list_t *client_list,
-                      struct sockaddr_storage *remoteaddr);
-int init_listener_on_player(fd_set *master, int *fdmax, int player_id);
+int init_listener_on_player(int sockfd, fd_set *master, int *fdmax,
+                            int player_id);
 int player_connect_master(const char *server, const char *server_port,
                           fd_set *master, int *fdmax, int *userid);
 #endif

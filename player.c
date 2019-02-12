@@ -14,19 +14,25 @@ int main(int argc, char *argv[]) {
   fd_set read_fds; // temp file descriptor list for select()
   int fdmax;       // maximum file descriptor number
   int listener;    // listen on listener, new connection on new_fd
-
   // build connection with ringmaster
   const char *server = argv[1];
   const char *server_port = argv[2];
+
   sockfd = player_connect_master(server, server_port, &master, &fdmax, &userid);
 
-  // init as a listner
-  listener = init_listener_on_player(&master, &fdmax, userid);
-  printf("%d", sockfd);
-  client_list_t client_list; // run through the existing connections
-  client_list.size = 0;
-  client_list.list = NULL;
+  printf("connect with server\n");
 
+  // init as a listner
+
+  listener = init_listener_on_player(sockfd, &master, &fdmax, userid);
+  memset(buf, 0, sizeof(buf));
+  int numbytes;
+  if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
+    perror("recv");
+    exit(1);
+  }
+  buf[numbytes] = '\0';
+  fprintf(stderr, "%s", buf);
   for (;;) {
     read_fds = master; // copy it
     if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
@@ -40,7 +46,6 @@ int main(int argc, char *argv[]) {
           // handle new connections
           struct sockaddr_storage remoteaddr; // connector's address information
           accept_new_connection(listener, &remoteaddr, &fdmax, &master);
-          updateClientList(&client_list, &remoteaddr);
         } else {
           // handle data from a client
           int nbytes;
