@@ -1,41 +1,64 @@
-#include "client.h"
-#define MAXDATASIZE 100 // max number of bytes we can get at once
+#include "server.h"
 
-void decodeID(int *userid, int *total_num, const char *buf) {
-  int i = 0;
-  while (buf[i] != ',') {
-    *userid = *userid * 10 + buf[i] - '0';
-    i++;
-  }
-  i++;
-  while (buf[i] != '\0') {
-    *total_num = *total_num * 10 + buf[i] - '0';
-    i++;
-  }
-}
 int main(int argc, char *argv[]) {
-  int sockfd, numbytes;
+  int sockfd;
   char buf[MAXDATASIZE];
   int userid = 0;
   if (argc != 3) {
     fprintf(stderr, "usage: player <machine_name> <port_num>\n");
     exit(1);
   }
-  const char *hostname = argv[1];
-  const char *port = argv[2];
-  sockfd = init(hostname, port);
-  char *str = "ready";
-  send(sockfd, str, sizeof(str), 0);
-  if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
-    perror("recv");
-    exit(1);
-  }
-  buf[numbytes] = '\0';
+  // set up server
+  fd_set master; // master file descriptor list
+  FD_ZERO(&master);
+  fd_set read_fds; // temp file descriptor list for select()
+  int fdmax;       // maximum file descriptor number
+  int listener;    // listen on listener, new connection on new_fd
 
-  int total_num = 0;
-  decodeID(&userid, &total_num, buf);
-  printf("Connected as player %d out of %d total players\n", userid, total_num);
+  // build connection with ringmaster
+  const char *server = argv[1];
+  const char *server_port = argv[2];
+  sockfd = player_connect_master(server, server_port, &master, &fdmax, &userid);
+
+  // init as a listner
+  listener = init_listener_on_player(&master, &fdmax, userid);
+  printf("%d", sockfd);
+  client_list_t client_list; // run through the existing connections
+  client_list.size = 0;
+  client_list.list = NULL;
+
+  for (;;) {
+    read_fds = master; // copy it
+    if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
+      perror("select");
+      exit(4);
+    }
+    // looking for data to read
+    for (int i = 0; i <= fdmax; i++) {
+      if (FD_ISSET(i, &read_fds)) { // we got one!!
+        if (i == listener) {
+          // handle new connections
+          struct sockaddr_storage remoteaddr; // connector's address information
+          accept_new_connection(listener, &remoteaddr, &fdmax, &master);
+          updateClientList(&client_list, &remoteaddr);
+        } else {
+          // handle data from a client
+          int nbytes;
+          if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
+            // got error or connection closed by client
+            disconZombie(nbytes, i, &master);
+          } else {
+            // we got some data from a client
+          }
+        } // END handle data from client
+      }   // END got new incoming connection
+    }     // END looping through file descriptors
+  }       // END for(;;)--and you thought it would never end!
+
+  return EXIT_SUCCESS;
+
+  /*
   close(sockfd);
 
-  return 0;
+  return 0;*/
 }

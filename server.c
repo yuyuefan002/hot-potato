@@ -1,4 +1,103 @@
 #include "server.h"
+
+int client_init(const char *hostname, const char *port) {
+  int sockfd;
+  struct addrinfo hints, *servinfo, *p;
+  int rv;
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  if ((rv = getaddrinfo(hostname, port, &hints, &servinfo)) != 0) {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+    return 1;
+  }
+
+  // loop through all the results and connect to the first we can
+  for (p = servinfo; p != NULL; p = p->ai_next) {
+    if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+      perror("client: socket");
+      continue;
+    }
+
+    if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+      close(sockfd);
+      perror("client: connect");
+      continue;
+    }
+
+    break;
+  }
+
+  if (p == NULL) {
+    fprintf(stderr, "client: failed to connect\n");
+    return 2;
+  }
+
+  freeaddrinfo(servinfo); // all done with this structure
+  return sockfd;
+}
+char *random_port(int player_id) {
+  srand((unsigned int)time(NULL) + player_id);
+  int random = 0;
+  while (random <= 1024) {
+    random = rand() % 65536;
+  }
+  char *port = malloc(10 * sizeof(char));
+  sprintf(port, "%d", random);
+  return port;
+}
+int init_rand_port(const char *hostname, int player_id) {
+  struct addrinfo hints, *servinfo;
+  int sockfd; // listen on sockfd
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+  int rv;
+  int yes = 1;
+  while (1) {
+    char *port = random_port(player_id);
+    if ((rv = getaddrinfo(hostname, port, &hints, &servinfo)) != 0) {
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+      exit(EXIT_FAILURE);
+    }
+    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype,
+                         servinfo->ai_protocol)) == -1) {
+      perror("server: socket");
+      exit(EXIT_FAILURE);
+    }
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+      perror("setsockopt failed\n");
+      exit(EXIT_FAILURE);
+    }
+    if (bind(sockfd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+      close(sockfd);
+      perror("server:bind\n");
+      free(port);
+      continue;
+    }
+    free(port);
+    break;
+  }
+  freeaddrinfo(servinfo); // all done with this structure
+  if (listen(sockfd, BACKLOG) == -1) {
+    perror("listen failed");
+    exit(EXIT_FAILURE);
+  }
+  return sockfd;
+}
+int init_listener_on_player(fd_set *master, int *fdmax, int player_id) {
+  char hostname[128];
+  gethostname(hostname, sizeof hostname);
+  printf("My hostname: %s\n", hostname);
+  int listener = init_rand_port(hostname, player_id);
+  FD_SET(listener, master);
+  // keep track of the biggest file descriptor
+  *fdmax = listener; // so far, it's this one
+  return listener;
+}
+
 int init(const char *hostname, const char *port) {
   struct addrinfo hints, *servinfo, *p;
   int sockfd; // listen on sockfd
@@ -197,4 +296,36 @@ void updateClientList(client_list_t *client_list,
   temp->sin_addr = ((struct sockaddr_in *)remoteaddr)->sin_addr;
   temp->sin_port = ((struct sockaddr_in *)remoteaddr)->sin_port;
   (*client_list).list[(*client_list).size++] = temp;
+}
+void player_decode_ID(int *userid, int *total_num, const char *buf) {
+  int i = 0;
+  while (buf[i] != ',') {
+    *userid = *userid * 10 + buf[i] - '0';
+    i++;
+  }
+  i++;
+  while (buf[i] != '\0') {
+    *total_num = *total_num * 10 + buf[i] - '0';
+    i++;
+  }
+}
+int player_connect_master(const char *server, const char *server_port,
+                          fd_set *master, int *fdmax, int *userid) {
+  int sockfd = client_init(server, server_port);
+  FD_SET(sockfd, master);
+  *fdmax = sockfd;
+  char *str = "ready";
+  send(sockfd, str, sizeof(str), 0);
+  int numbytes;
+  char buf[MAXDATASIZE];
+  if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
+    perror("recv");
+    exit(1);
+  }
+  buf[numbytes] = '\0';
+  int total_num = 0;
+  player_decode_ID(userid, &total_num, buf);
+  printf("Connected as player %d out of %d total players\n", *userid,
+         total_num);
+  return sockfd;
 }
