@@ -185,7 +185,7 @@ void printSysInfo(int player_num, int hop_num) {
   printf("Players = %d\n", player_num);
   printf("Hops = %d\n", hop_num);
 }
-void print_start_info(int startplayer_num) {
+void printStartInfo(int startplayer_num) {
   printf("Ready to start the game, sending potato to player <%d>\n",
          startplayer_num);
 }
@@ -244,32 +244,8 @@ void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
   }
   print_forward_info(player_id, num_players, random);
 }
-void start_game(int fdmax, fd_set master, int num_players, int num_hops) {
-  srand((unsigned int)time(NULL) + num_players);
-  int random = rand() % num_players;
-  char str[20] = "";
-  sprintf(str, "%d", num_hops);
-  int size = sizeof(str);
-  printf("%d\n", fdmax - random);
-  if (sendall(fdmax - random, str, &size) == -1) {
-    perror("send");
-    exit(EXIT_FAILURE);
-  }
-  print_start_info(num_players - random);
-  /*for (int j = 0; j <= fdmax; j++) {
-    // send to everyone!
-    if (FD_ISSET(j, &master)) {
-      printf("%d\n", j);
-      // except the listener and ourselves
 
-      if (send(j, "hi", sizeof("hi"), 0) == -1) {
-        perror("send");
-      }
-    }
-  }*/
-}
-
-void print_trace(char *trace) {
+void printTrace(const char *trace) {
   printf("Trace of potato:\n");
   printf("%s\n", trace);
 }
@@ -521,17 +497,7 @@ char *updateTrace(char *buf, char *trace) {
   }
   return trace;
 }
-void end_game(int fdmax, fd_set master) {
-  for (int i = 0; i <= fdmax; i++) {
-    // send to everyone!
-    if (FD_ISSET(i, &master)) {
-      if (send(i, "end", sizeof("end"), 0) == -1) {
-        perror("send\n");
-        exit(EXIT_FAILURE);
-      }
-    }
-  }
-}
+
 void closeall(int fdmax, fd_set *master) {
   for (int i = 0; i <= fdmax; i++) {
     // send to everyone!
@@ -540,4 +506,109 @@ void closeall(int fdmax, fd_set *master) {
       FD_CLR(i, master);
     }
   }
+}
+
+void waitingPlayer(int listener, int *fdmax, fd_set *master, int num_players) {
+  int current_id = 1;
+  client_list_t client_list; // run through the existing connections
+  client_list.size = 0;
+  client_list.list = NULL;
+  while (current_id <= num_players) {
+    // handle new connections
+    int newfd = accNewConnection(listener, fdmax, master);
+    setConnection(newfd, current_id, num_players, &client_list);
+    printPlayerReadyInfo(current_id++);
+  }
+  close(listener);
+  FD_CLR(listener, master);
+  for (size_t i = 0; i < client_list.size; i++) {
+    free(client_list.list[i]);
+  }
+  free(client_list.list);
+}
+/*
+  preparePotato
+  This function wait until all play send "ready"
+
+  Input:
+  fdmax:
+  master:
+  numplayers:
+ */
+void preparePotato(int fdmax, fd_set *master, int num_players) {
+  int ready = 0;
+  while (ready < num_players) {
+    fd_set read_fds = *master;
+    if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
+      perror("select");
+      exit(4);
+    }
+    for (int i = 0; i <= fdmax; i++) {
+      if (FD_ISSET(i, &read_fds)) { // we got one!!
+        int nbytes;
+        char buf[MAXDATASIZE];
+        if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0)
+          // got error or connection closed by client
+          disconZombie(nbytes, i, master);
+        else if (strcmp(buf, "ready") == 0)
+          ready++;
+      }
+    }
+  }
+}
+void kickOff(int fdmax, int num_players, int num_hops) {
+  srand((unsigned int)time(NULL) + num_players);
+  int random = rand() % num_players;
+  char str[20] = "";
+  sprintf(str, "%d", num_hops);
+  int size = sizeof(str);
+  if (sendall(fdmax - random, str, &size) == -1) {
+    perror("send");
+    exit(EXIT_FAILURE);
+  }
+  printStartInfo(num_players - random);
+}
+char *runGame(int fdmax, fd_set *master) {
+  int end = 0;
+  char *trace = NULL;
+  while (end == 0) {
+    fd_set read_fds = *master;
+    if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
+      perror("select");
+      exit(4);
+    }
+    // looking for data to read
+    for (int i = 0; i <= fdmax; i++) {
+      if (FD_ISSET(i, &read_fds)) { // we got one!!
+                                    // handle data from a client
+        char buf[MAXDATASIZE];
+        int nbytes;
+        if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
+          // got error or connection closed by client
+          disconZombie(nbytes, i, master);
+        } else {
+          if (buf[0] == 'i' && buf[1] == 'd' && buf[2] == ':') {
+            send(i, "ack", sizeof("ack"), 0);
+            trace = updateTrace(buf, trace);
+          }
+          if (strcmp(buf, "end") == 0)
+            end = 1;
+        }
+      }
+    }
+  }
+  return trace;
+}
+void endGame(int fdmax, fd_set *master, const char *trace) {
+  for (int i = 0; i <= fdmax; i++) {
+    // send to everyone!
+    if (FD_ISSET(i, master)) {
+      if (send(i, "end", sizeof("end"), 0) == -1) {
+        perror("send\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+  printTrace(trace);
+  closeall(fdmax, master);
 }

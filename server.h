@@ -35,8 +35,6 @@ void setConnection(int new_fd, int current_id, int num_players,
 int wait_client_ready(int new_fd);
 
 void printSysInfo(int player_num, int hop_num);
-void printPlayerReadyInfo(int player_num);
-void print_trace(char *trace);
 int sendall(int s, char *buf, int *len);
 int accNewConnection(int listener, int *fdmax, fd_set *master);
 void disconZombie(int nbytes, int i, fd_set *master);
@@ -48,11 +46,16 @@ int player_connect_master(const char *server, const char *server_port,
 int connect_server(const char *server, const char *server_port, fd_set *master,
                    int *fdmax);
 void interpIpPort(const char *buf, int start, int end, char *ip, char *port);
-void start_game(int fdmax, fd_set master, int num_players, int num_hops);
+
 void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
                      int player_id, int num_players, int hop);
 char *receive_potato(char *buf, int *hop);
 char *updateTrace(char *buf, char *trace);
 void closeall(int fdmax, fd_set *master);
-void end_game(int fdmax, fd_set master);
+
+void waitingPlayer(int listener, int *fdmax, fd_set *master, int num_players);
+void preparePotato(int fdmax, fd_set *master, int num_players);
+void kickOff(int fdmax, int num_players, int num_hops);
+char *runGame(int fdmax, fd_set *master);
+void endGame(int fdmax, fd_set *master, const char *trace);
 #endif
