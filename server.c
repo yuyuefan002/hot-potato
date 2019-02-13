@@ -228,8 +228,8 @@ char *receive_potato(char *buf, int *hop) {
   return append(hop_str, "");
 }
 void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
-                     int player_id, int num_players) {
-  srand((unsigned int)time(NULL) + player_id);
+                     int player_id, int num_players, int hop) {
+  srand((unsigned int)time(NULL) + hop);
   int random = rand() % 2;
   int size = sizeof(msg);
 

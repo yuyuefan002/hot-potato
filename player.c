@@ -140,8 +140,8 @@ int main(int argc, char *argv[]) {
             int hop = 0;
             potato = receive_potato(buf, &hop);
             if (hop >= 0)
-              send_out_potato(neigh, fdmax, master, potato, userid,
-                              num_players);
+              send_out_potato(neigh, fdmax, master, potato, userid, num_players,
+                              hop);
             else {
               tell_master_im_potato(sockfd);
               printf("I'm it\n");

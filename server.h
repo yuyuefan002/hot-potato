@@ -51,6 +51,6 @@ int connect_server(const char *server, const char *server_port, fd_set *master,
 void interpret_ip(const char *buf, int start, int end, char *ip, char *port);
 void start_game(int fdmax, fd_set master, int num_players, int num_hops);
 void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
-                     int player_id, int num_players);
+                     int player_id, int num_players, int hop);
 char *receive_potato(char *buf, int *hop);
 #endif
