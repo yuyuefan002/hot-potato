@@ -38,8 +38,7 @@ void printSysInfo(int player_num, int hop_num);
 void printPlayerReadyInfo(int player_num);
 void print_trace(char *trace);
 int sendall(int s, char *buf, int *len);
-int accNewConnection(int listener, struct sockaddr_storage *remoteaddr,
-                     int *fdmax, fd_set *master);
+int accNewConnection(int listener, int *fdmax, fd_set *master);
 void disconZombie(int nbytes, int i, fd_set *master);
 int init_listener_on_player(int sockfd, fd_set *master, int *fdmax,
                             int player_id);

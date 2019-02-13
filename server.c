@@ -326,11 +326,12 @@ int sendall(int s, char *buf, int *len) {
   return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
 }
 
-int accNewConnection(int listener, struct sockaddr_storage *remoteaddr,
-                     int *fdmax, fd_set *master) {
+int accNewConnection(int listener, int *fdmax, fd_set *master) {
   int newfd;
-  socklen_t addrlen = sizeof *remoteaddr;
-  if ((newfd = accept(listener, (struct sockaddr *)remoteaddr, &addrlen)) ==
+  struct sockaddr_storage remoteaddr; // connector's address information
+
+  socklen_t addrlen = sizeof remoteaddr;
+  if ((newfd = accept(listener, (struct sockaddr *)&remoteaddr, &addrlen)) ==
       -1) {
     perror("accept");
     exit(EXIT_FAILURE);

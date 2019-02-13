@@ -86,9 +86,7 @@ int main(int argc, char *argv[]) {
       if (FD_ISSET(i, &read_fds)) { // we got one!!
         if (i == listener) {
           // handle new connections
-          struct sockaddr_storage remoteaddr; // connector's address information
-          neigh[neigh_num++] =
-              accNewConnection(listener, &remoteaddr, &fdmax, &master);
+          neigh[neigh_num++] = accNewConnection(listener, &fdmax, &master);
           left--;
         } else {
           // handle data from a client
@@ -122,8 +120,8 @@ int main(int argc, char *argv[]) {
       if (FD_ISSET(i, &read_fds)) { // we got one!!
         if (i == listener) {
           // handle new connections
-          struct sockaddr_storage remoteaddr; // connector's address information
-          accNewConnection(listener, &remoteaddr, &fdmax, &master);
+
+          accNewConnection(listener, &fdmax, &master);
           left--;
           if (left == 0) {
             close(listener);

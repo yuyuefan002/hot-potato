@@ -24,8 +24,7 @@ int main(int argc, char **argv) {
   int fdmax;
   int listener;
 
-  struct sockaddr_storage remoteaddr; // connector's address information
-  char buf[256];                      // buffer for client data
+  char buf[256]; // buffer for client data
   int nbytes;
 
   listener = init(hostname, port);
@@ -40,7 +39,7 @@ int main(int argc, char **argv) {
   client_list.list = NULL;
   while (current_id <= num_players) {
     // handle new connections
-    int newfd = accNewConnection(listener, &remoteaddr, &fdmax, &master);
+    int newfd = accNewConnection(listener, &fdmax, &master);
     setConnection(newfd, current_id, num_players, &client_list);
     printPlayerReadyInfo(current_id++);
   }
