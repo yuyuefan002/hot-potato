@@ -37,6 +37,7 @@ int wait_client_ready(int new_fd);
 
 void print_system_info(int player_num, int hop_num);
 void print_player_ready_info(int player_num);
+void print_trace(char *trace);
 int sendall(int s, char *buf, int *len);
 int accept_new_connection(int listener, struct sockaddr_storage *remoteaddr,
                           int *fdmax, fd_set *master);
@@ -53,4 +54,7 @@ void start_game(int fdmax, fd_set master, int num_players, int num_hops);
 void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
                      int player_id, int num_players, int hop);
 char *receive_potato(char *buf, int *hop);
+char *updateTrace(char *buf, char *trace);
+void closeall(int fdmax, fd_set *master);
+void end_game(int fdmax, fd_set master);
 #endif

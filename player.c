@@ -103,14 +103,15 @@ int main(int argc, char *argv[]) {
   }
   close(listener);
   FD_CLR(listener, &master);
-  if (userid == 0) {
+  if (userid == 1) {
     int temp = neigh[0];
     neigh[0] = neigh[1];
     neigh[1] = temp;
   }
   printf("ready for game\n");
   send(sockfd, "ready", sizeof("ready"), 0);
-  for (;;) {
+  int end = 0;
+  while (end == 0) {
     read_fds = master; // copy it
     if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
       perror("select");
@@ -134,10 +135,19 @@ int main(int argc, char *argv[]) {
           if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
             // got error or connection closed by client
             disconZombie(nbytes, i, &master);
+          } else if (strcmp(buf, "end") == 0) {
+            end = 1;
           } else {
             // we got some data from a client
             char *potato = NULL;
             int hop = 0;
+            char id[10];
+            sprintf(id, "id:%d", userid);
+            send(sockfd, id, sizeof(id), 0);
+            char ack[10] = "";
+            while (strcmp(ack, "ack") != 0) {
+              recv(sockfd, ack, sizeof ack, 0);
+            }
             potato = receive_potato(buf, &hop);
             if (hop >= 0)
               send_out_potato(neigh, fdmax, master, potato, userid, num_players,
@@ -153,6 +163,7 @@ int main(int argc, char *argv[]) {
     }     // END looping through file descriptors
   }       // END for(;;)--and you thought it would never end!
 
+  closeall(fdmax, &master);
   return EXIT_SUCCESS;
 
   /*

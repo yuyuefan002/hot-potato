@@ -11,6 +11,7 @@ int main(int argc, char **argv) {
   char *port = argv[1];
   int num_players = atoi(argv[2]);
   int num_hops = atoi(argv[3]);
+  char *trace = NULL;
   if (verify_args(port, num_players, num_hops) == false) {
     return EXIT_FAILURE;
   }
@@ -84,7 +85,8 @@ int main(int argc, char **argv) {
   }
   printf("all player connected\n");
   start_game(fdmax, master, num_players, num_hops);
-  for (;;) {
+  int end = 0;
+  while (end == 0) {
     read_fds = master; // copy it
     if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
       perror("select");
@@ -100,13 +102,27 @@ int main(int argc, char **argv) {
             disconZombie(nbytes, i, &master);
           } else {
             printf("%s\n", buf);
+            if (buf[0] == 'i' && buf[1] == 'd' && buf[2] == ':') {
+              send(i, "ack", sizeof("ack"), 0);
+              trace = updateTrace(buf, trace);
+            }
+            if (strcmp(buf, "end") == 0)
+              end = 1;
+
             // we got some data from a client
           }
         } // END handle data from client
       }   // END got new incoming connection
     }     // END looping through file descriptors
   }       // END for(;;)--and you thought it would never end!
-
+  end_game(fdmax, master);
+  print_trace(trace);
+  closeall(fdmax, &master);
+  for (size_t i = 0; i < client_list.size; i++) {
+    free(client_list.list[i]);
+  }
+  free(client_list.list);
+  free(trace);
   return EXIT_SUCCESS;
   // initialize the potato and send it out
   // receive the potato

@@ -269,7 +269,10 @@ void start_game(int fdmax, fd_set master, int num_players, int num_hops) {
   }*/
 }
 
-void print_trace(potato_t potato) { printf("Trace of potato:\n"); }
+void print_trace(char *trace) {
+  printf("Trace of potato:\n");
+  printf("%s\n", trace);
+}
 
 void print_player_ready_info(int player_num) {
   printf("Player %d is ready to play\n", player_num);
@@ -477,4 +480,44 @@ int player_connect_master(const char *server, const char *server_port,
   printf("Connected as player %d out of %d total players\n", *userid,
          *num_players);
   return sockfd;
+}
+char *updateTrace(char *buf, char *trace) {
+  int i = 3;
+  int id = 0;
+  while (buf[i] != '\0') {
+    id = id * 10 + buf[i] - '0';
+    i++;
+  }
+  char id_str[5];
+
+  char *temp = trace;
+  if (trace != NULL) {
+    sprintf(id_str, ",%d", id);
+    trace = append(trace, id_str);
+    free(temp);
+  } else {
+    sprintf(id_str, "%d", id);
+    trace = append(id_str, "");
+  }
+  return trace;
+}
+void end_game(int fdmax, fd_set master) {
+  for (int i = 0; i <= fdmax; i++) {
+    // send to everyone!
+    if (FD_ISSET(i, &master)) {
+      if (send(i, "end", sizeof("end"), 0) == -1) {
+        perror("send\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+}
+void closeall(int fdmax, fd_set *master) {
+  for (int i = 0; i <= fdmax; i++) {
+    // send to everyone!
+    if (FD_ISSET(i, master)) {
+      close(i);
+      FD_CLR(i, master);
+    }
+  }
 }
