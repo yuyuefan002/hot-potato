@@ -44,12 +44,13 @@ void disconZombie(int nbytes, int i, fd_set *master);
 int init_listener_on_player(int sockfd, fd_set *master, int *fdmax,
                             int player_id);
 int player_connect_master(const char *server, const char *server_port,
-                          fd_set *master, int *fdmax, int *userid);
+                          fd_set *master, int *fdmax, int *userid,
+                          int *num_players);
 int connect_server(const char *server, const char *server_port, fd_set *master,
                    int *fdmax);
 void interpret_ip(const char *buf, int start, int end, char *ip, char *port);
 void start_game(int fdmax, fd_set master, int num_players, int num_hops);
 void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
-                     int player_id);
+                     int player_id, int num_players);
 char *receive_potato(char *buf, int *hop);
 #endif

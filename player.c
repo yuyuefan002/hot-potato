@@ -1,4 +1,11 @@
 #include "server.h"
+void tell_master_im_potato(int sockfd) {
+  char msg[10] = "";
+  sprintf(msg, "end");
+  //  int size = sizeof(msg);
+  send(sockfd, msg, sizeof(msg), 0);
+}
+
 void connect_neigh(const char *buf, int start, int end, fd_set *master,
                    int *fdmax, int *neigh, int *neigh_num) {
   char ip[INET_ADDRSTRLEN];
@@ -32,6 +39,7 @@ int main(int argc, char *argv[]) {
   int sockfd;
   char buf[MAXDATASIZE];
   int userid = 0;
+  int num_players = 0;
   if (argc != 3) {
     fprintf(stderr, "usage: player <machine_name> <port_num>\n");
     exit(1);
@@ -48,7 +56,8 @@ int main(int argc, char *argv[]) {
   const char *server = argv[1];
   const char *server_port = argv[2];
 
-  sockfd = player_connect_master(server, server_port, &master, &fdmax, &userid);
+  sockfd = player_connect_master(server, server_port, &master, &fdmax, &userid,
+                                 &num_players);
 
   // init as a listner
 
@@ -94,6 +103,11 @@ int main(int argc, char *argv[]) {
   }
   close(listener);
   FD_CLR(listener, &master);
+  if (userid == 0) {
+    int temp = neigh[0];
+    neigh[0] = neigh[1];
+    neigh[1] = temp;
+  }
   printf("ready for game\n");
   send(sockfd, "ready", sizeof("ready"), 0);
   for (;;) {
@@ -122,16 +136,15 @@ int main(int argc, char *argv[]) {
             disconZombie(nbytes, i, &master);
           } else {
             // we got some data from a client
-            printf("buf:%s\n", buf);
             char *potato = NULL;
             int hop = 0;
             potato = receive_potato(buf, &hop);
-            if (hop > 0)
-              send_out_potato(neigh, fdmax, master, potato, userid);
+            if (hop >= 0)
+              send_out_potato(neigh, fdmax, master, potato, userid,
+                              num_players);
             else {
+              tell_master_im_potato(sockfd);
               printf("I'm it\n");
-              int size = sizeof(potato);
-              sendall(sockfd, potato, &size);
             }
             free(potato);
           }

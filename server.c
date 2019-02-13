@@ -189,8 +189,20 @@ void print_start_info(int startplayer_num) {
   printf("Ready to start the game, sending potato to player <%d>\n",
          startplayer_num);
 }
-void print_forward_info(int player_num) {
-  printf("Sending potato to %d\n", player_num);
+void print_forward_info(int my_id, int num_players, int dir) {
+  int neigh;
+  if (dir == 0) {
+    if (my_id == 1)
+      neigh = num_players;
+    else
+      neigh = my_id - 1;
+  } else {
+    if (my_id == num_players)
+      neigh = 1;
+    else
+      neigh = my_id + 1;
+  }
+  printf("Sending potato to %d\n", neigh);
 }
 char *append(const char *str1, const char *str2) {
   char *new;
@@ -206,22 +218,17 @@ char *append(const char *str1, const char *str2) {
 }
 char *receive_potato(char *buf, int *hop) {
   int i = 0;
-  printf("before\n");
-  while (buf[i] != ':') {
+  while (buf[i] != '\0') {
     *hop = *hop * 10 + buf[i] - '0';
     i++;
   }
   *hop -= 1;
   char hop_str[10];
   sprintf(hop_str, "%d", *hop);
-  /*  int len = i - start;
-  strncpy(ip, buf + start, len);
-  ip[len] = '\0';*/
-
   return append(hop_str, "");
 }
 void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
-                     int player_id) {
+                     int player_id, int num_players) {
   srand((unsigned int)time(NULL) + player_id);
   int random = rand() % 2;
   int size = sizeof(msg);
@@ -235,23 +242,13 @@ void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
     perror("send");
     exit(EXIT_FAILURE);
   }
-  print_forward_info(player_id - 1 + random * 2);
-  /*for (int j = 0; j <= 1; j++) {
-    // send to everyone!
-    if (FD_ISSET(neigh[j], &master)) {
-      // except the listener and ourselves
-
-      if (send(neigh[j], "hi", sizeof("hi"), 0) == -1) {
-        perror("send");
-      }
-    }
-  }*/
+  print_forward_info(player_id, num_players, random);
 }
 void start_game(int fdmax, fd_set master, int num_players, int num_hops) {
   srand((unsigned int)time(NULL) + num_players);
   int random = rand() % num_players;
   char str[20] = "";
-  sprintf(str, "%d:", num_hops);
+  sprintf(str, "%d", num_hops);
   int size = sizeof(str);
   printf("%d\n", fdmax - random);
   if (sendall(fdmax - random, str, &size) == -1) {
@@ -464,7 +461,8 @@ int connect_server(const char *server, const char *server_port, fd_set *master,
   return sockfd;
 }
 int player_connect_master(const char *server, const char *server_port,
-                          fd_set *master, int *fdmax, int *userid) {
+                          fd_set *master, int *fdmax, int *userid,
+                          int *num_players) {
   int sockfd = connect_server(server, server_port, master, fdmax);
   char *str = "ready";
   send(sockfd, str, sizeof(str), 0);
@@ -475,9 +473,8 @@ int player_connect_master(const char *server, const char *server_port,
     exit(1);
   }
   buf[numbytes] = '\0';
-  int total_num = 0;
-  player_decode_id(userid, &total_num, buf);
+  player_decode_id(userid, num_players, buf);
   printf("Connected as player %d out of %d total players\n", *userid,
-         total_num);
+         *num_players);
   return sockfd;
 }

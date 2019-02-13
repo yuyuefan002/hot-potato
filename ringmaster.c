@@ -30,10 +30,6 @@ int main(int argc, char **argv) {
   FD_SET(listener, &master);
   // keep track of the biggest file descriptor
   fdmax = listener; // so far, it's this one
-  // init potato
-  potato_t potato;
-  potato.hop = num_hops;
-  potato.trace = NULL;
 
   // build connection with each player and setting up the game
   int i, current_id = 1;
@@ -103,7 +99,7 @@ int main(int argc, char **argv) {
             // got error or connection closed by client
             disconZombie(nbytes, i, &master);
           } else {
-            printf("%d\n", potato.hop);
+            printf("%s\n", buf);
             // we got some data from a client
           }
         } // END handle data from client
