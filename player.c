@@ -7,13 +7,14 @@ void connect_neigh(const char *buf, int start, int end, fd_set *master,
   connect_server(ip, port, master, fdmax);
   printf("connect ip:%s,port:%s success\n", ip, port);
 }
-void decode_neigh(const char *buf, fd_set *master, int *fdmax) {
+int decode_neigh(const char *buf, fd_set *master, int *fdmax) {
   int i = 0;
   int neighs = 0;
   while (buf[i] != ':') {
     neighs = neighs * 10 + buf[i] - '0';
     i++;
   }
+  int left = 2 - neighs;
   while (neighs) {
     i++;
     int start = i;
@@ -24,6 +25,7 @@ void decode_neigh(const char *buf, fd_set *master, int *fdmax) {
     connect_neigh(buf, start, end, master, fdmax);
     neighs--;
   }
+  return left;
 }
 int main(int argc, char *argv[]) {
   int sockfd;
@@ -56,7 +58,11 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   buf[numbytes] = '\0';
-  decode_neigh(buf, &master, &fdmax);
+  int left = decode_neigh(buf, &master, &fdmax);
+  if (left == 0) {
+    close(listener);
+    FD_CLR(listener, &master);
+  }
   for (;;) {
     read_fds = master; // copy it
     if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
@@ -70,6 +76,11 @@ int main(int argc, char *argv[]) {
           // handle new connections
           struct sockaddr_storage remoteaddr; // connector's address information
           accept_new_connection(listener, &remoteaddr, &fdmax, &master);
+          left--;
+          if (left == 0) {
+            close(listener);
+            FD_CLR(listener, &master);
+          }
         } else {
           // handle data from a client
           int nbytes;
