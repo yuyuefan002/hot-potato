@@ -1,5 +1,4 @@
 #include "server.h"
-
 int client_init(const char *hostname, const char *port) {
   int sockfd;
   struct addrinfo hints, *servinfo, *p;
@@ -180,14 +179,13 @@ bool verify_args(char *port, int num_player, int num_hop) {
   return true;
 }
 
-void printSysInfo(int player_num, int hop_num) {
+void printSysInfo(int num_players, int num_hops) {
   printf("Potato Ringmaster\n");
-  printf("Players = %d\n", player_num);
-  printf("Hops = %d\n", hop_num);
+  printf("Players = %d\n", num_players);
+  printf("Hops = %d\n", num_hops);
 }
-void printStartInfo(int startplayer_num) {
-  printf("Ready to start the game, sending potato to player <%d>\n",
-         startplayer_num);
+void printStartInfo(int player) {
+  printf("Ready to start the game, sending potato to player %d\n", player);
 }
 void print_forward_info(int my_id, int num_players, int dir) {
   int neigh;
@@ -452,17 +450,11 @@ void player_decode_id(int *userid, int *total_num, const char *buf) {
     i++;
   }
 }
-int connect_server(const char *server, const char *server_port, fd_set *master,
-                   int *fdmax) {
-  int sockfd = client_init(server, server_port);
+int connectServer(const char **argv, fd_set *master, int *fdmax, int *userid,
+                  int *num_players) {
+  int sockfd = client_init(argv[1], argv[2]);
   FD_SET(sockfd, master);
   *fdmax = sockfd;
-  return sockfd;
-}
-int player_connect_master(const char *server, const char *server_port,
-                          fd_set *master, int *fdmax, int *userid,
-                          int *num_players) {
-  int sockfd = connect_server(server, server_port, master, fdmax);
   char *str = "ready";
   send(sockfd, str, sizeof(str), 0);
   int numbytes;
@@ -476,6 +468,73 @@ int player_connect_master(const char *server, const char *server_port,
   printf("Connected as player %d out of %d total players\n", *userid,
          *num_players);
   return sockfd;
+}
+void connect_neigh(const char *buf, int start, int end, fd_set *master,
+                   int *fdmax, int *neigh, int *neigh_num) {
+  char ip[INET_ADDRSTRLEN];
+  char port[10] = "";
+  interpIpPort(buf, start, end, ip, port);
+
+  int newfd = client_init(ip, port);
+  neigh[(*neigh_num)++] = newfd;
+  FD_SET(newfd, master);
+  if (newfd > *fdmax)
+    *fdmax = newfd;
+  printf("connect ip:%s,port:%s success\n", ip, port);
+}
+
+int decode_neigh(const char *buf, fd_set *master, int *fdmax, int *neigh,
+                 int *neigh_num) {
+  int i = 0;
+  int neighs = 0;
+  while (buf[i] != ':') {
+    neighs = neighs * 10 + buf[i] - '0';
+    i++;
+  }
+  int left = 2 - neighs;
+  while (neighs) {
+    i++;
+    int start = i;
+    while (buf[i] != ':') {
+      i++;
+    }
+    int end = i;
+    connect_neigh(buf, start, end, master, fdmax, neigh, neigh_num);
+    neighs--;
+  }
+  return left;
+}
+void connectNeighs(int sockfd, int *fdmax, fd_set *master, int *neigh,
+                   int userid) {
+  // init as a listner
+  int listener = init_listener_on_player(sockfd, master, fdmax, userid);
+
+  char buf[MAXDATASIZE];
+  int numbytes;
+  int neigh_num = 0;
+  if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
+    perror("recv");
+    exit(1);
+  }
+  buf[numbytes] = '\0';
+  int left = decode_neigh(buf, master, fdmax, neigh, &neigh_num);
+  if (left == 0) {
+    close(listener);
+    FD_CLR(listener, master);
+  }
+  while (left) {
+
+    // handle new connections
+    neigh[neigh_num++] = accNewConnection(listener, fdmax, master);
+    left--;
+  }
+  close(listener);
+  FD_CLR(listener, master);
+  if (userid == 1) {
+    int temp = neigh[0];
+    neigh[0] = neigh[1];
+    neigh[1] = temp;
+  }
 }
 char *updateTrace(char *buf, char *trace) {
   int i = 3;
@@ -611,4 +670,63 @@ void endGame(int fdmax, fd_set *master, const char *trace) {
   }
   printTrace(trace);
   closeall(fdmax, master);
+}
+void tell_master_im_potato(int sockfd) {
+  char msg[10] = "";
+  sprintf(msg, "end");
+  //  int size = sizeof(msg);
+  send(sockfd, msg, sizeof(msg), 0);
+}
+
+void playWithPotato(int sockfd, int fdmax, fd_set master, int userid,
+                    int *neigh, int num_players) {
+  int end = 0;
+  while (end == 0) {
+    fd_set read_fds = master; // copy it
+    if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
+      perror("select");
+      exit(4);
+    }
+    // looking for data to read
+    for (int i = 0; i <= fdmax; i++) {
+      if (FD_ISSET(i, &read_fds)) { // we got one!!
+
+        // handle data from a client
+        char buf[MAXDATASIZE];
+        int nbytes;
+        if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
+          // got error or connection closed by client
+          disconZombie(nbytes, i, &master);
+        } else if (strcmp(buf, "end") == 0) {
+          end = 1;
+        } else {
+          // we got some data from a client
+          char *potato = NULL;
+          int hop = 0;
+          char id[10];
+          sprintf(id, "id:%d", userid);
+          send(sockfd, id, sizeof(id), 0);
+          char ack[10] = "";
+          while (strcmp(ack, "ack") != 0) {
+            recv(sockfd, ack, sizeof ack, 0);
+          }
+          potato = receive_potato(buf, &hop);
+          if (hop >= 0)
+            send_out_potato(neigh, fdmax, master, potato, userid, num_players,
+                            hop);
+          else {
+            tell_master_im_potato(sockfd);
+            printf("I'm it\n");
+          }
+          free(potato);
+        }
+      }
+    }
+  }
+}
+void readyForGame(int sockfd) {
+  if (send(sockfd, "ready", sizeof("ready"), 0) == -1) {
+    fprintf(stderr, "send fail\n");
+    exit(EXIT_FAILURE);
+  }
 }
