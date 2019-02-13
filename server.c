@@ -189,6 +189,89 @@ void print_start_info(int startplayer_num) {
   printf("Ready to start the game, sending potato to player <%d>\n",
          startplayer_num);
 }
+void print_forward_info(int player_num) {
+  printf("Sending potato to %d\n", player_num);
+}
+char *append(const char *str1, const char *str2) {
+  char *new;
+  if ((new = malloc(strlen(str1) + strlen(str2) + 1)) != NULL) {
+    new[0] = '\0';
+    strcat(new, str1);
+    strcat(new, str2);
+  } else {
+    perror("malloc\n");
+    exit(EXIT_FAILURE);
+  }
+  return new;
+}
+char *receive_potato(char *buf, int *hop) {
+  int i = 0;
+  printf("before\n");
+  while (buf[i] != ':') {
+    *hop = *hop * 10 + buf[i] - '0';
+    i++;
+  }
+  *hop -= 1;
+  char hop_str[10];
+  sprintf(hop_str, "%d", *hop);
+  /*  int len = i - start;
+  strncpy(ip, buf + start, len);
+  ip[len] = '\0';*/
+
+  return append(hop_str, "");
+}
+void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
+                     int player_id) {
+  srand((unsigned int)time(NULL) + player_id);
+  int random = rand() % 2;
+  int size = sizeof(msg);
+
+  if (!FD_ISSET(neigh[random], &master)) {
+    fprintf(stderr, "socket unset\n");
+    exit(EXIT_FAILURE);
+  }
+
+  if (sendall(neigh[random], msg, &size) == -1) {
+    perror("send");
+    exit(EXIT_FAILURE);
+  }
+  print_forward_info(player_id - 1 + random * 2);
+  /*for (int j = 0; j <= 1; j++) {
+    // send to everyone!
+    if (FD_ISSET(neigh[j], &master)) {
+      // except the listener and ourselves
+
+      if (send(neigh[j], "hi", sizeof("hi"), 0) == -1) {
+        perror("send");
+      }
+    }
+  }*/
+}
+void start_game(int fdmax, fd_set master, int num_players, int num_hops) {
+  srand((unsigned int)time(NULL) + num_players);
+  int random = rand() % num_players;
+  char str[20] = "";
+  sprintf(str, "%d:", num_hops);
+  int size = sizeof(str);
+  printf("%d\n", fdmax - random);
+  if (sendall(fdmax - random, str, &size) == -1) {
+    perror("send");
+    exit(EXIT_FAILURE);
+  }
+  print_start_info(num_players - random);
+  /*for (int j = 0; j <= fdmax; j++) {
+    // send to everyone!
+    if (FD_ISSET(j, &master)) {
+      printf("%d\n", j);
+      // except the listener and ourselves
+
+      if (send(j, "hi", sizeof("hi"), 0) == -1) {
+        perror("send");
+      }
+    }
+  }*/
+}
+
 void print_trace(potato_t potato) { printf("Trace of potato:\n"); }
 
 void print_player_ready_info(int player_num) {

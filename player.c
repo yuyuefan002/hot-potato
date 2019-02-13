@@ -1,13 +1,14 @@
 #include "server.h"
 void connect_neigh(const char *buf, int start, int end, fd_set *master,
-                   int *fdmax) {
+                   int *fdmax, int *neigh, int *neigh_num) {
   char ip[INET_ADDRSTRLEN];
   char port[10] = "";
   interpret_ip(buf, start, end, ip, port);
-  connect_server(ip, port, master, fdmax);
+  neigh[(*neigh_num)++] = connect_server(ip, port, master, fdmax);
   printf("connect ip:%s,port:%s success\n", ip, port);
 }
-int decode_neigh(const char *buf, fd_set *master, int *fdmax) {
+int decode_neigh(const char *buf, fd_set *master, int *fdmax, int *neigh,
+                 int *neigh_num) {
   int i = 0;
   int neighs = 0;
   while (buf[i] != ':') {
@@ -22,7 +23,7 @@ int decode_neigh(const char *buf, fd_set *master, int *fdmax) {
       i++;
     }
     int end = i;
-    connect_neigh(buf, start, end, master, fdmax);
+    connect_neigh(buf, start, end, master, fdmax, neigh, neigh_num);
     neighs--;
   }
   return left;
@@ -41,6 +42,8 @@ int main(int argc, char *argv[]) {
   fd_set read_fds; // temp file descriptor list for select()
   int fdmax;       // maximum file descriptor number
   int listener;    // listen on listener, new connection on new_fd
+  int neigh[2];
+  int neigh_num = 0;
   // build connection with ringmaster
   const char *server = argv[1];
   const char *server_port = argv[2];
@@ -58,11 +61,41 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   buf[numbytes] = '\0';
-  int left = decode_neigh(buf, &master, &fdmax);
+  int left = decode_neigh(buf, &master, &fdmax, neigh, &neigh_num);
   if (left == 0) {
     close(listener);
     FD_CLR(listener, &master);
   }
+  while (left) {
+    read_fds = master; // copy it
+    if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
+      perror("select");
+      exit(4);
+    }
+    // looking for data to read
+    for (int i = 0; i <= fdmax; i++) {
+      if (FD_ISSET(i, &read_fds)) { // we got one!!
+        if (i == listener) {
+          // handle new connections
+          struct sockaddr_storage remoteaddr; // connector's address information
+          neigh[neigh_num++] =
+              accept_new_connection(listener, &remoteaddr, &fdmax, &master);
+          left--;
+        } else {
+          // handle data from a client
+          int nbytes;
+          if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
+            // got error or connection closed by client
+            disconZombie(nbytes, i, &master);
+          }
+        } // END handle data from client
+      }   // END got new incoming connection
+    }     // END looping through file descriptors
+  }
+  close(listener);
+  FD_CLR(listener, &master);
+  printf("ready for game\n");
+  send(sockfd, "ready", sizeof("ready"), 0);
   for (;;) {
     read_fds = master; // copy it
     if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
@@ -89,6 +122,18 @@ int main(int argc, char *argv[]) {
             disconZombie(nbytes, i, &master);
           } else {
             // we got some data from a client
+            printf("buf:%s\n", buf);
+            char *potato = NULL;
+            int hop = 0;
+            potato = receive_potato(buf, &hop);
+            if (hop > 0)
+              send_out_potato(neigh, fdmax, master, potato, userid);
+            else {
+              printf("I'm it\n");
+              int size = sizeof(potato);
+              sendall(sockfd, potato, &size);
+            }
+            free(potato);
           }
         } // END handle data from client
       }   // END got new incoming connection
