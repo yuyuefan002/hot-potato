@@ -1,5 +1,30 @@
 #include "server.h"
-
+void connect_neigh(const char *buf, int start, int end, fd_set *master,
+                   int *fdmax) {
+  char ip[INET_ADDRSTRLEN];
+  char port[10] = "";
+  interpret_ip(buf, start, end, ip, port);
+  connect_server(ip, port, master, fdmax);
+  printf("connect ip:%s,port:%s success\n", ip, port);
+}
+void decode_neigh(const char *buf, fd_set *master, int *fdmax) {
+  int i = 0;
+  int neighs = 0;
+  while (buf[i] != ':') {
+    neighs = neighs * 10 + buf[i] - '0';
+    i++;
+  }
+  while (neighs) {
+    i++;
+    int start = i;
+    while (buf[i] != ':') {
+      i++;
+    }
+    int end = i;
+    connect_neigh(buf, start, end, master, fdmax);
+    neighs--;
+  }
+}
 int main(int argc, char *argv[]) {
   int sockfd;
   char buf[MAXDATASIZE];
@@ -20,11 +45,10 @@ int main(int argc, char *argv[]) {
 
   sockfd = player_connect_master(server, server_port, &master, &fdmax, &userid);
 
-  printf("connect with server\n");
-
   // init as a listner
 
   listener = init_listener_on_player(sockfd, &master, &fdmax, userid);
+
   memset(buf, 0, sizeof(buf));
   int numbytes;
   if ((numbytes = recv(sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
@@ -32,7 +56,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   buf[numbytes] = '\0';
-  fprintf(stderr, "%s", buf);
+  decode_neigh(buf, &master, &fdmax);
   for (;;) {
     read_fds = master; // copy it
     if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {

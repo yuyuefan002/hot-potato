@@ -31,7 +31,7 @@ int client_init(const char *hostname, const char *port) {
 
   if (p == NULL) {
     fprintf(stderr, "client: failed to connect\n");
-    return 2;
+    exit(EXIT_FAILURE);
   }
 
   freeaddrinfo(servinfo); // all done with this structure
@@ -47,11 +47,17 @@ char *random_port(int player_id) {
   sprintf(port, "%d", random);
   return port;
 }
-void tell_master_my_listening_port(int sockfd, const char *port) {
-  send(sockfd, port, sizeof(port), 0);
+void tell_master_my_listening_ip(int sockfd, const char *ip, const char *port) {
+  int len = strlen(ip) + strlen(port) + 1;
+  char str[len];
+  sprintf(str, "%s,%s", ip, port);
+  send(sockfd, str, sizeof(str), 0);
 }
 int init_rand_port(const char *hostname, int player_id, int masterfd) {
   struct addrinfo hints, *servinfo;
+  struct hostent *he = gethostbyname(hostname);
+  struct in_addr **addr_list = (struct in_addr **)he->h_addr_list;
+  const char *ip = inet_ntoa(*addr_list[0]);
   int sockfd; // listen on sockfd
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -60,9 +66,11 @@ int init_rand_port(const char *hostname, int player_id, int masterfd) {
   int rv;
   int yes = 1;
   char *port = NULL;
+
   while (1) {
     port = random_port(player_id);
-    if ((rv = getaddrinfo(hostname, port, &hints, &servinfo)) != 0) {
+
+    if ((rv = getaddrinfo(ip, port, &hints, &servinfo)) != 0) {
       fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
       exit(EXIT_FAILURE);
     }
@@ -89,7 +97,7 @@ int init_rand_port(const char *hostname, int player_id, int masterfd) {
     perror("listen failed");
     exit(EXIT_FAILURE);
   }
-  tell_master_my_listening_port(masterfd, port);
+  tell_master_my_listening_ip(masterfd, ip, port);
   free(port);
   return sockfd;
 }
@@ -98,10 +106,12 @@ int init_listener_on_player(int sockfd, fd_set *master, int *fdmax,
                             int player_id) {
   char hostname[128];
   gethostname(hostname, sizeof hostname);
+
   int listener = init_rand_port(hostname, player_id, sockfd);
   FD_SET(listener, master);
   // keep track of the biggest file descriptor
-  *fdmax = listener; // so far, it's this one
+  if (listener > *fdmax)
+    *fdmax = listener;
   return listener;
 }
 
@@ -202,21 +212,7 @@ int wait_client_ready(int new_fd) {
   }
   return 0;
 }
-char *wait_client_listener(int new_fd) {
-  char *buf = malloc(10);
-  int numbytes;
-  if ((numbytes = recv(new_fd, buf, 10 - 1, 0)) == -1) {
-    perror("recv");
-    exit(EXIT_FAILURE);
-  }
-  if (numbytes == 0) {
-    fprintf(stderr, "server: socket %d hung up\n", new_fd);
-    exit(EXIT_FAILURE);
-  }
-  buf[numbytes] = '\0';
-  printf("%s", buf);
-  return buf;
-}
+
 int send_client_id(int new_fd, int id, int total_num) {
   char str[20] = "";
   sprintf(str, "%d,%d", id, total_num);
@@ -270,15 +266,21 @@ int send_neigh_info(int new_fd, int current_id, int num_players,
   if (current_id == 1) {
     sprintf(str, "0:");
   } else if (current_id == num_players) {
-    int ip = client_list.list[current_id - 2]->sin_addr.s_addr;
+    struct in_addr ip = client_list.list[current_id - 2]->sin_addr;
+    char ip1[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &ip, ip1, INET_ADDRSTRLEN);
     int port = client_list.list[current_id - 2]->sin_port;
-    int ip2 = client_list.list[0]->sin_addr.s_addr;
+    ip = client_list.list[0]->sin_addr;
+    char ip2[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &ip, ip2, INET_ADDRSTRLEN);
     int port2 = client_list.list[0]->sin_port;
-    sprintf(str, "2:%d,%d:%d,%d", ip, port, ip2, port2);
+    sprintf(str, "2:%s,%d:%s,%d:", ip1, port, ip2, port2);
   } else {
-    int ip = client_list.list[current_id - 2]->sin_addr.s_addr;
+    struct in_addr ip = client_list.list[current_id - 2]->sin_addr;
+    char ip1[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &ip, ip1, INET_ADDRSTRLEN);
     int port = client_list.list[current_id - 2]->sin_port;
-    sprintf(str, "1:%d,%d", ip, port);
+    sprintf(str, "1:%s,%d:", ip1, port);
   }
   if (send(new_fd, str, sizeof(str), 0) == -1) {
     perror("send");
@@ -286,16 +288,47 @@ int send_neigh_info(int new_fd, int current_id, int num_players,
   }
   return 0;
 }
-void updateClientList(client_list_t *client_list,
-                      struct sockaddr_storage *remoteaddr, char *port) {
+void updateClientList(client_list_t *client_list, const char *ip,
+                      const char *port) {
   (*client_list).list =
       realloc((*client_list).list,
               ((*client_list).size + 1) * sizeof(*(*client_list).list));
   client_info_t *temp = malloc(sizeof(**(*client_list).list));
-  temp->sin_addr = ((struct sockaddr_in *)remoteaddr)->sin_addr;
+  inet_pton(AF_INET, ip, &(temp->sin_addr)); // IPv4
   temp->sin_port = atoi(port);
   (*client_list).list[(*client_list).size++] = temp;
 }
+char *wait_client_listener(int new_fd) {
+  char *buf = malloc(20);
+  int numbytes;
+  if ((numbytes = recv(new_fd, buf, 20 - 1, 0)) == -1) {
+    perror("recv");
+    exit(EXIT_FAILURE);
+  }
+  if (numbytes == 0) {
+    fprintf(stderr, "server: socket %d hung up\n", new_fd);
+    exit(EXIT_FAILURE);
+  }
+  buf[numbytes] = '\0';
+  return buf;
+}
+void interpret_ip(const char *buf, int start, int end, char *ip, char *port) {
+  int i = start;
+  int p = 0;
+  while (buf[i] != ',') {
+    i++;
+  }
+  int len = i - start;
+  strncpy(ip, buf + start, len);
+  ip[len] = '\0';
+  i++;
+  while (i < end) {
+    p = p * 10 + buf[i] - '0';
+    i++;
+  }
+  sprintf(port, "%d", p);
+}
+
 void set_up_connection(int new_fd, int current_id, int num_players,
                        client_list_t *client_list,
                        struct sockaddr_storage *remoteaddr) {
@@ -304,13 +337,16 @@ void set_up_connection(int new_fd, int current_id, int num_players,
     close(new_fd);
     exit(EXIT_FAILURE);
   }
-  printf("receive ready\n");
   if (send_client_id(new_fd, current_id, num_players) == -1)
     fprintf(stderr, "fail to send info to client\n");
-  char *port = NULL;
-  port = wait_client_listener(new_fd);
-  updateClientList(client_list, remoteaddr, port);
-  free(port);
+  char *buf = NULL;
+  buf = wait_client_listener(new_fd);
+  char ip[INET_ADDRSTRLEN];
+  char port[10] = "";
+  interpret_ip(buf, 0, strlen(buf), ip, port);
+  printf("%s,%s\n", ip, port);
+  updateClientList(client_list, ip, port);
+  free(buf);
   if (send_neigh_info(new_fd, current_id, num_players, *client_list) == -1)
     fprintf(stderr, "fail to set up connection with neighs\n");
 }
@@ -337,11 +373,16 @@ void player_decode_id(int *userid, int *total_num, const char *buf) {
     i++;
   }
 }
-int player_connect_master(const char *server, const char *server_port,
-                          fd_set *master, int *fdmax, int *userid) {
+int connect_server(const char *server, const char *server_port, fd_set *master,
+                   int *fdmax) {
   int sockfd = client_init(server, server_port);
   FD_SET(sockfd, master);
   *fdmax = sockfd;
+  return sockfd;
+}
+int player_connect_master(const char *server, const char *server_port,
+                          fd_set *master, int *fdmax, int *userid) {
+  int sockfd = connect_server(server, server_port, master, fdmax);
   char *str = "ready";
   send(sockfd, str, sizeof(str), 0);
   int numbytes;

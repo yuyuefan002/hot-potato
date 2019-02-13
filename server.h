@@ -45,4 +45,7 @@ int init_listener_on_player(int sockfd, fd_set *master, int *fdmax,
                             int player_id);
 int player_connect_master(const char *server, const char *server_port,
                           fd_set *master, int *fdmax, int *userid);
+int connect_server(const char *server, const char *server_port, fd_set *master,
+                   int *fdmax);
+void interpret_ip(const char *buf, int start, int end, char *ip, char *port);
 #endif
