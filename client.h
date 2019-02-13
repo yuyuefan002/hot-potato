@@ -1,16 +1,12 @@
 #ifndef __CLIENT_H__
 #define __CLIENT_H__
-#include <errno.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include <arpa/inet.h>
-
-int init(const char *hostname, const char *port);
+#include "base.h"
+// player
+int logIn(const char **argv, fd_set *master, int *fdmax, int *userid,
+          int *num_players);
+void connectNeighs(int sockfd, int *fdmax, fd_set *master, int *neigh,
+                   int userid);
+void readyForGame(int sockfd);
+void playWithPotato(int sockfd, int fdmax, fd_set master, int userid,
+                    int *neigh, int num_players);
 #endif

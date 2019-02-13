@@ -13,9 +13,7 @@ int main(int argc, char **argv) {
   int num_players = atoi(argv[2]);
   int num_hops = atoi(argv[3]);
   char *trace = NULL;
-  if (verify_args(port, num_players, num_hops) == false) {
-    return EXIT_FAILURE;
-  }
+  verifyArgs(port, num_players, num_hops);
 
   // set up server
   fd_set master; // master file descriptor list

@@ -1,4 +1,4 @@
-#include "server.h"
+#include "client.h"
 
 int main(int argc, char *argv[]) {
   int sockfd;
@@ -13,9 +13,8 @@ int main(int argc, char *argv[]) {
   FD_ZERO(&master);
   int fdmax; // maximum file descriptor number
   int neigh[2];
-  // connect server
-  sockfd = connectServer((const char **)argv, &master, &fdmax, &userid,
-                         &num_players);
+  // connect server and get id
+  sockfd = logIn((const char **)argv, &master, &fdmax, &userid, &num_players);
   // connect neighs
   connectNeighs(sockfd, &fdmax, &master, neigh, userid);
 
