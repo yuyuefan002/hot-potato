@@ -6,6 +6,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Usage: ringmaster <port_num> <num_players> <num_hops>\n");
     return EXIT_FAILURE;
   }
+
   // take arguments
   const char *hostname = NULL;
   char *port = argv[1];
@@ -19,47 +20,29 @@ int main(int argc, char **argv) {
   // set up server
   fd_set master; // master file descriptor list
   FD_ZERO(&master);
-  fd_set read_fds; // temp file descriptor list for select()
-  int fdmax;       // maximum file descriptor number
-  int listener;    // listen on listener, new connection on new_fd
+  fd_set read_fds;
+  int fdmax;
+  int listener;
 
   struct sockaddr_storage remoteaddr; // connector's address information
   char buf[256];                      // buffer for client data
   int nbytes;
-  listener = init(hostname, port);
-  print_system_info(num_players, num_hops);
-  FD_SET(listener, &master);
-  // keep track of the biggest file descriptor
-  fdmax = listener; // so far, it's this one
 
+  listener = init(hostname, port);
+  FD_SET(listener, &master);
+  fdmax = listener;
+
+  printSysInfo(num_players, num_hops);
   // build connection with each player and setting up the game
   int i, current_id = 1;
   client_list_t client_list; // run through the existing connections
   client_list.size = 0;
   client_list.list = NULL;
   while (current_id <= num_players) {
-    read_fds = master;
-    if (select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1) {
-      perror("select");
-      exit(4);
-    }
-    for (i = 0; i <= fdmax; i++) {
-      if (FD_ISSET(i, &read_fds)) { // we got one!!
-        if (i == listener) {
-          // handle new connections
-          int newfd =
-              accept_new_connection(listener, &remoteaddr, &fdmax, &master);
-          set_up_connection(newfd, current_id, num_players, &client_list,
-                            &remoteaddr);
-          print_player_ready_info(current_id++);
-        } else {
-          if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
-            // got error or connection closed by client
-            disconZombie(nbytes, i, &master);
-          }
-        }
-      }
-    }
+    // handle new connections
+    int newfd = accNewConnection(listener, &remoteaddr, &fdmax, &master);
+    setConnection(newfd, current_id, num_players, &client_list);
+    printPlayerReadyInfo(current_id++);
   }
   close(listener);
   FD_CLR(listener, &master);

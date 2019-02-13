@@ -10,7 +10,7 @@ void connect_neigh(const char *buf, int start, int end, fd_set *master,
                    int *fdmax, int *neigh, int *neigh_num) {
   char ip[INET_ADDRSTRLEN];
   char port[10] = "";
-  interpret_ip(buf, start, end, ip, port);
+  interpIpPort(buf, start, end, ip, port);
   neigh[(*neigh_num)++] = connect_server(ip, port, master, fdmax);
   printf("connect ip:%s,port:%s success\n", ip, port);
 }
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
           // handle new connections
           struct sockaddr_storage remoteaddr; // connector's address information
           neigh[neigh_num++] =
-              accept_new_connection(listener, &remoteaddr, &fdmax, &master);
+              accNewConnection(listener, &remoteaddr, &fdmax, &master);
           left--;
         } else {
           // handle data from a client
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
         if (i == listener) {
           // handle new connections
           struct sockaddr_storage remoteaddr; // connector's address information
-          accept_new_connection(listener, &remoteaddr, &fdmax, &master);
+          accNewConnection(listener, &remoteaddr, &fdmax, &master);
           left--;
           if (left == 0) {
             close(listener);

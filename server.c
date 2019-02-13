@@ -180,7 +180,7 @@ bool verify_args(char *port, int num_player, int num_hop) {
   return true;
 }
 
-void print_system_info(int player_num, int hop_num) {
+void printSysInfo(int player_num, int hop_num) {
   printf("Potato Ringmaster\n");
   printf("Players = %d\n", player_num);
   printf("Hops = %d\n", hop_num);
@@ -274,7 +274,7 @@ void print_trace(char *trace) {
   printf("%s\n", trace);
 }
 
-void print_player_ready_info(int player_num) {
+void printPlayerReadyInfo(int player_num) {
   printf("Player %d is ready to play\n", player_num);
 }
 
@@ -326,22 +326,21 @@ int sendall(int s, char *buf, int *len) {
   return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
 }
 
-int accept_new_connection(int listener, struct sockaddr_storage *remoteaddr,
-                          int *fdmax, fd_set *master) {
-  socklen_t addrlen;
+int accNewConnection(int listener, struct sockaddr_storage *remoteaddr,
+                     int *fdmax, fd_set *master) {
   int newfd;
-  addrlen = sizeof *remoteaddr;
-  newfd = accept(listener, (struct sockaddr *)remoteaddr, &addrlen);
-
-  if (newfd == -1) {
+  socklen_t addrlen = sizeof *remoteaddr;
+  if ((newfd = accept(listener, (struct sockaddr *)remoteaddr, &addrlen)) ==
+      -1) {
     perror("accept");
+    exit(EXIT_FAILURE);
   } else {
     FD_SET(newfd, master); // add to master set
     if (newfd > *fdmax) {  // keep track of the max
       *fdmax = newfd;
     }
+    return newfd;
   }
-  return newfd;
 }
 int send_neigh_info(int new_fd, int current_id, int num_players,
                     client_list_t client_list) {
@@ -395,43 +394,63 @@ char *wait_client_listener(int new_fd) {
   buf[numbytes] = '\0';
   return buf;
 }
-void interpret_ip(const char *buf, int start, int end, char *ip, char *port) {
+/*
+  interpIpPort
+  This function interperate string into ip and port
+
+  Input:
+  buf: whole string
+  start: start point
+  end:
+ */
+char *substr(const char *buf, int start, int end) {
+  char *sub = malloc((end - start));
+  int len = end - start;
+  strncpy(sub, buf + start, len);
+  sub[len] = '\0';
+  return sub;
+}
+void interpIpPort(const char *buf, int start, int end, char *ip, char *port) {
   int i = start;
-  int p = 0;
   while (buf[i] != ',') {
     i++;
   }
-  int len = i - start;
-  strncpy(ip, buf + start, len);
-  ip[len] = '\0';
-  i++;
-  while (i < end) {
-    p = p * 10 + buf[i] - '0';
-    i++;
-  }
-  sprintf(port, "%d", p);
+  const char *ip_tmp = substr(buf, start, i);
+  const char *port_tmp = substr(buf, i + 1, end);
+  sprintf(ip, "%s", ip_tmp);
+  sprintf(port, "%s", port_tmp);
 }
-
-void set_up_connection(int new_fd, int current_id, int num_players,
-                       client_list_t *client_list,
-                       struct sockaddr_storage *remoteaddr) {
+/*
+  setConnection
+  This function set up connection between master and player, player and its
+  neigh
+  Input:
+  new_fd: player socket fd
+  current_id: player id determine who are neighs
+  num_players: total player
+  client_list: player info
+*/
+void setConnection(int new_fd, int current_id, int num_players,
+                   client_list_t *client_list) {
   if (wait_client_ready(new_fd) == -1) {
     fprintf(stderr, "fail to receive ready info from client\n");
-    close(new_fd);
     exit(EXIT_FAILURE);
   }
-  if (send_client_id(new_fd, current_id, num_players) == -1)
+  if (send_client_id(new_fd, current_id, num_players) == -1) {
     fprintf(stderr, "fail to send info to client\n");
-  char *buf = NULL;
-  buf = wait_client_listener(new_fd);
+    exit(EXIT_FAILURE);
+  }
+  char *buf = wait_client_listener(new_fd);
   char ip[INET_ADDRSTRLEN];
   char port[10] = "";
-  interpret_ip(buf, 0, strlen(buf), ip, port);
-  printf("%s,%s\n", ip, port);
+
+  interpIpPort(buf, 0, strlen(buf), ip, port);
   updateClientList(client_list, ip, port);
-  free(buf);
-  if (send_neigh_info(new_fd, current_id, num_players, *client_list) == -1)
+  if (send_neigh_info(new_fd, current_id, num_players, *client_list) == -1) {
     fprintf(stderr, "fail to set up connection with neighs\n");
+    exit(EXIT_FAILURE);
+  }
+  free(buf);
 }
 void disconZombie(int nbytes, int i, fd_set *master) {
   if (nbytes == 0) {
