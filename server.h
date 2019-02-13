@@ -26,37 +26,23 @@ struct _client_list_t {
 };
 typedef struct _client_info_t client_info_t;
 typedef struct _client_list_t client_list_t;
+// server
 bool verify_args(char *port, int num_player, int num_hop);
 int init(const char *hostname, const char *port);
-int client_init(const char *hostname, const char *port);
-void setConnection(int new_fd, int current_id, int num_players,
-                   client_list_t *client_list);
-int wait_client_ready(int new_fd);
-
 void printSysInfo(int num_players, int num_hops);
-int sendall(int s, char *buf, int *len);
-int accNewConnection(int listener, int *fdmax, fd_set *master);
-void disconZombie(int nbytes, int i, fd_set *master);
-int init_listener_on_player(int sockfd, fd_set *master, int *fdmax,
-                            int player_id);
-int connectServer(const char **argv, fd_set *master, int *fdmax, int *userid,
-                  int *num_players);
-void interpIpPort(const char *buf, int start, int end, char *ip, char *port);
-
-void send_out_potato(int *neigh, int fdmax, fd_set master, char *msg,
-                     int player_id, int num_players, int hop);
-char *receive_potato(char *buf, int *hop);
-char *updateTrace(char *buf, char *trace);
-void closeall(int fdmax, fd_set *master);
-
 void waitingPlayer(int listener, int *fdmax, fd_set *master, int num_players);
 void preparePotato(int fdmax, fd_set *master, int num_players);
 void kickOff(int fdmax, int num_players, int num_hops);
 char *runGame(int fdmax, fd_set *master);
 void endGame(int fdmax, fd_set *master, const char *trace);
+
+// player
+int connectServer(const char **argv, fd_set *master, int *fdmax, int *userid,
+                  int *num_players);
 void connectNeighs(int sockfd, int *fdmax, fd_set *master, int *neigh,
                    int userid);
+void readyForGame(int sockfd);
 void playWithPotato(int sockfd, int fdmax, fd_set master, int userid,
                     int *neigh, int num_players);
-void readyForGame(int sockfd);
+void closeall(int fdmax, fd_set *master);
 #endif
