@@ -97,8 +97,6 @@ void closeall(int fdmax, fd_set *master) {
  */
 void disconZombie(int nbytes, int i, fd_set *master) {
   if (nbytes == 0) {
-    // connection closed
-    printf("selectserver: socket %d hung up\n", i);
   } else {
     perror("recv");
   }
