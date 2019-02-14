@@ -107,23 +107,23 @@ int send_client_id(int new_fd, int id, int total_num) {
 int send_neigh_info(int new_fd, int current_id, int num_players,
                     client_list_t client_list) {
   char str[40] = "";
-  if (current_id == 1) {
+  if (current_id == 0) {
     sprintf(str, "0:");
-  } else if (current_id == num_players) {
-    struct in_addr ip = client_list.list[current_id - 2]->sin_addr;
+  } else if (current_id == num_players - 1) {
+    struct in_addr ip = client_list.list[current_id - 1]->sin_addr;
     char ip1[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &ip, ip1, INET_ADDRSTRLEN);
-    int port = client_list.list[current_id - 2]->sin_port;
+    int port = client_list.list[current_id - 1]->sin_port;
     ip = client_list.list[0]->sin_addr;
     char ip2[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &ip, ip2, INET_ADDRSTRLEN);
     int port2 = client_list.list[0]->sin_port;
     sprintf(str, "2:%s,%d:%s,%d:", ip1, port, ip2, port2);
   } else {
-    struct in_addr ip = client_list.list[current_id - 2]->sin_addr;
+    struct in_addr ip = client_list.list[current_id - 1]->sin_addr;
     char ip1[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &ip, ip1, INET_ADDRSTRLEN);
-    int port = client_list.list[current_id - 2]->sin_port;
+    int port = client_list.list[current_id - 1]->sin_port;
     sprintf(str, "1:%s,%d:", ip1, port);
   }
   if (send(new_fd, str, sizeof(str), 0) == -1) {
@@ -211,11 +211,11 @@ char *updateTrace(char *buf, char *trace) {
 }
 
 void waitingPlayer(int listener, int *fdmax, fd_set *master, int num_players) {
-  int current_id = 1;
+  int current_id = 0;
   client_list_t client_list; // run through the existing connections
   client_list.size = 0;
   client_list.list = NULL;
-  while (current_id <= num_players) {
+  while (current_id < num_players) {
     // handle new connections
     int newfd = accNewConnection(listener, fdmax, master);
     setConnection(newfd, current_id, num_players, &client_list);
@@ -268,7 +268,7 @@ void kickOff(int fdmax, int num_players, int num_hops) {
     perror("send");
     exit(EXIT_FAILURE);
   }
-  printStartInfo(num_players - random);
+  printStartInfo(num_players - 1 - random);
 }
 char *runGame(int fdmax, fd_set *master) {
   int end = 0;

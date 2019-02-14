@@ -21,13 +21,13 @@ void receive_potato(char *buf, int *hop, char *potato) {
 void printForwardInfo(int my_id, int num_players, int dir) {
   int neigh;
   if (dir == 0) {
-    if (my_id == 1)
-      neigh = num_players;
+    if (my_id == 0)
+      neigh = num_players - 1;
     else
       neigh = my_id - 1;
   } else {
-    if (my_id == num_players)
-      neigh = 1;
+    if (my_id == num_players - 1)
+      neigh = 0;
     else
       neigh = my_id + 1;
   }
@@ -212,6 +212,15 @@ void decodeId(int *userid, int *total_num, const char *buf) {
   }
 }
 
+const char *fetchIp(const char *hostname) {
+  struct hostent *he;
+  if ((he = gethostbyname(hostname)) == NULL) {
+    fprintf(stderr, "no such hostname\n");
+    exit(EXIT_FAILURE);
+  }
+  struct in_addr **addr_list = (struct in_addr **)he->h_addr_list;
+  return inet_ntoa(*addr_list[0]);
+}
 /*
   logIn
   This function connect server and get back player's id
@@ -224,9 +233,9 @@ void decodeId(int *userid, int *total_num, const char *buf) {
   Output:
   sockfd: the socket connecting server
  */
-int logIn(const char **argv, fd_set *master, int *fdmax, int *userid,
-          int *num_players) {
-  int sockfd = connectServer(argv[1], argv[2]);
+int logIn(const char *ip, const char *port, fd_set *master, int *fdmax,
+          int *userid, int *num_players) {
+  int sockfd = connectServer(ip, port);
   FD_SET(sockfd, master);
   *fdmax = sockfd;
   char *str = "ready";
@@ -314,7 +323,7 @@ void connectNeighs(int sockfd, int *fdmax, fd_set *master, int *neigh,
   }
   close(listener);
   FD_CLR(listener, master);
-  if (userid == 1) {
+  if (userid == 0) {
     swap(&neigh[0], &neigh[1]);
   }
 }

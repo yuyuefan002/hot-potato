@@ -9,12 +9,13 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   // set up server
+  const char *ip = fetchIp(argv[1]);
   fd_set master; // master file descriptor list
   FD_ZERO(&master);
   int fdmax; // maximum file descriptor number
   int neigh[2];
   // connect server and get id
-  sockfd = logIn((const char **)argv, &master, &fdmax, &userid, &num_players);
+  sockfd = logIn(ip, argv[2], &master, &fdmax, &userid, &num_players);
   // connect neighs
   connectNeighs(sockfd, &fdmax, &master, neigh, userid);
 
