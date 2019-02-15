@@ -61,10 +61,10 @@ char *append(const char *str1, const char *str2) {
   Output:
   substring
  */
-void substr(char *new, const char *buf, int start, int end) {
+void substr(char *newstr, const char *buf, int start, int end) {
   int len = end - start;
-  strncpy(new, buf + start, len);
-  new[len] = '\0';
+  strncpy(newstr, buf + start, len);
+  newstr[len] = '\0';
 }
 
 /*

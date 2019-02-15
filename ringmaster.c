@@ -32,13 +32,17 @@ int main(int argc, char **argv) {
 
   // waiting all connect be set up
   preparePotato(fdmax, &master, num_players);
+  num_hops -= 1;
 
-  // send potato to random player
-  kickOff(fdmax, num_players, num_hops);
+  if (num_hops >= 0) {
+    // send potato to random player
+    kickOff(fdmax, num_players, num_hops);
 
-  // run game, track the potato
-  trace = runGame(fdmax, &master);
+    // run game, track the potato
+    trace = runGame(fdmax, &master);
 
+    printTrace(trace);
+  }
   // take potato back, clean all connections
   endGame(fdmax, &master, trace);
 

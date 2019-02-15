@@ -20,6 +20,7 @@ void waitingPlayer(int listener, int *fdmax, fd_set *master, int num_players);
 void preparePotato(int fdmax, fd_set *master, int num_players);
 void kickOff(int fdmax, int num_players, int num_hops);
 char *runGame(int fdmax, fd_set *master);
+void printTrace(const char *trace);
 void endGame(int fdmax, fd_set *master, const char *trace);
 
 #endif

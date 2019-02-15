@@ -18,7 +18,8 @@
 
 int sendall(int s, char *buf, int *len);
 char *append(const char *str1, const char *str2);
-void substr(char *new, const char *buf, int start, int end);
+
+void substr(char *newstr, const char *buf, int start, int end);
 void swap(int *a, int *b);
 int accNewConnection(int listener, int *fdmax, fd_set *master);
 void disconZombie(int nbytes, int i, fd_set *master);

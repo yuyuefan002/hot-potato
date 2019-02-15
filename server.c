@@ -68,7 +68,8 @@ void printStartInfo(int player) {
 
 void printTrace(const char *trace) {
   printf("Trace of potato:\n");
-  printf("%s\n", trace);
+  if (trace)
+    printf("%s\n", trace);
 }
 
 void printPlayerReadyInfo(int player_num) {
@@ -311,6 +312,6 @@ void endGame(int fdmax, fd_set *master, const char *trace) {
       }
     }
   }
-  printTrace(trace);
+  // printTrace(trace);
   closeall(fdmax, master);
 }
