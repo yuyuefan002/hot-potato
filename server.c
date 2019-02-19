@@ -107,7 +107,7 @@ int send_client_id(int new_fd, int id, int total_num) {
 
 int send_neigh_info(int new_fd, int current_id, int num_players,
                     client_list_t client_list) {
-  char str[40] = "";
+  char str[50] = "";
   if (current_id == 0) {
     sprintf(str, "0:");
   } else if (current_id == num_players - 1) {

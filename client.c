@@ -288,7 +288,7 @@ int connectNeigh(const char *buf, fd_set *master, int *fdmax, int *neigh,
   while (neighs) {
     i++;
     int start = i;
-    while (buf[i] != ':')
+    while (buf[i] != ':' && buf[i] != '\0')
       i++;
     int end = i;
     connect2(buf, start, end, master, fdmax, neigh, neigh_num);
